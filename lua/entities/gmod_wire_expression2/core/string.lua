@@ -656,3 +656,46 @@ e2function number string:unicodeLength(number startPos, number endPos)
 	self.prf = self.prf + #this * 0.001
 	return -1
 end
+
+---------------------------------------------------------------------------
+---- Compression
+local char = string.char
+
+__e2setcost (15)
+
+e2function array compress48(string data)
+	local ret = {}
+	for i = 1, #data, 6 do
+		local a, b, c, d, e, f = string.byte(data, i, i + 5)
+		local packed = a * 0x10000000000
+		-- Combined because it would be far too bothersome to check every value
+		if b or c or d then
+			packed = packed + (b or 0) * 0x100000000 + (c or 0) * 0x1000000 + (d or 0) * 0x10000
+			-- Put this here because e, f depend on b, c, d to exist
+			if e or f then packed = packed + (e or 0) * 0x100 + (f or 0) end
+		end
+		
+		table.insert(ret, packed)
+	end
+	return ret
+end
+
+e2function string decompress48(array data)
+	local str = {}
+	for _, packed in ipairs(data) do
+		local a, b, c, d, e, f = (packed / 0x10000000000) % 256, (packed / 0x100000000) % 256, (packed / 0x1000000) % 256, (packed / 0x10000) % 256, (packed / 0x100) % 256, packed % 256
+		
+		-- funny dependency triangle
+		table.insert(str, char(a))
+		if b ~= 0 then table.insert(str, char(b))
+			if c ~= 0 then table.insert(str, char(c))
+				if d ~= 0 then table.insert(str, char(d))
+					if e ~= 0 then table.insert(str, char(e))
+						if f ~= 0 then table.insert(str, char(f)) end
+					end
+				end
+			end
+		end
+	end
+	return table.concat(str)
+end

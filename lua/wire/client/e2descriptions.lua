@@ -174,6 +174,8 @@ E2Helper.Descriptions["matchFirst(s:s)"] = "runs string.match(S, S2) and returns
 E2Helper.Descriptions["matchFirst(s:sn)"] = "runs string.match(S, S2, N) and returns the first match or an empty string if the match failed"
 E2Helper.Descriptions["gmatch(s:s)"] = "runs string.gmatch(S, S2) and returns the captures in arrays in a table"
 E2Helper.Descriptions["gmatch(s:sn)"] = "runs string.gmatch(S, S2, N) and returns the captures in arrays in a table"
+E2Helper.Descriptions["compress48"] = "Compresses a string into an array of 48-bit integers (numbers)"
+E2Helper.Descriptions["decompress48"] = "Decompresses the output of compress48 into a string"
 
 -- Entity/Player
 E2Helper.Descriptions["entity(n)"] = "Gets the entity associated with the id"
@@ -707,6 +709,7 @@ E2Helper.Descriptions["writeString(xwl:snnnn)"] = "Same as XWL:writeString(snnn)
 E2Helper.Descriptions["writeString(xwl:snnvnn)"] = "Same as XWL:writeString(snnvn), with an extra argument for flashing text. 0 or 1 is recommended"
 E2Helper.Descriptions["writeString(xwl:snnnv)"] = "Same as XWL:writeString(snnn), with an extra argument for background colour"
 E2Helper.Descriptions["writeString(xwl:snnnvn)"] = "Same as XWL:writeString(snnnv), with an extra argument for flashing text. 0 or 1 is recommended"
+E2Helper.Descriptions["writeString48(xwl:ns)"] = "Writes a compressed string to the given address. Returns the length of written data. Compressed strings are not null-terminated by default!"
 E2Helper.Descriptions["writeUnicodeString(xwl:snnv)"] = "Same as XWL:writeUnicodeString(snn), with an extra argument for the text colour"
 E2Helper.Descriptions["writeUnicodeString(xwl:snnvn)"] = "Same as XWL:writeUnicodeString(snnv), with an extra argument for background colour. This is in the form of a 3-digit RGB code. 0 is black, while 999 is white, 900 is pure red and so on"
 E2Helper.Descriptions["writeUnicodeString(xwl:snnvv)"] = "Same as XWL:writeUnicodeString(snnv), with an extra argument for background colour"
@@ -722,7 +725,10 @@ E2Helper.Descriptions["readArray(xwl:nn)"] = "Reads an array's elements from a p
 E2Helper.Descriptions["writeCell(xwl:nn)"] = "Writes value into specified memory cell. Deprecated, use XWL[N] = X instead"
 E2Helper.Descriptions["readCell(xwl:n)"] = "Returns contents of the specified memory cell. Deprecated, use XWL[N] instead"
 E2Helper.Descriptions["readString(xwl:n)"] = "Reads a null-terminated string from the given address. Returns an empty string on failure"
+E2Helper.Descriptions["readString48(xwl:n)"] = "Reads a null-terminated compressed string from the given address. Compressed strings are not null-terminated by default!"
+E2Helper.Descriptions["readString48(xwl:nn)"] = "Reads a compressed string from the given address. Returns an empty string on failure"
 E2Helper.Descriptions["writeArray(xwl:nr)"] = "Writes an array's elements into a piece of memory. Strings and sub-tables (angles, vectors, matrices) are written as pointers to the actual data. Strings are written null-terminated"
+E2Helper.Descriptions["writeArraySimple(xwl:nr)"] = "Writes only an array's numeric elements into a piece of memory, without null termination, returns number of elements written"
 E2Helper.Descriptions["writeTable(xwl:nt)"] = "Same as writeArray, except it uses the numerically indexed variables of the table instead"
 E2Helper.Descriptions["inputs(xwl:)"] = "Returns an array of all the inputs that XWL has without their types. Returns an empty array if it has none"
 E2Helper.Descriptions["outputs(xwl:)"] = "Returns an array of all the outputs that XWL has without their types. Returns an empty array if it has none"

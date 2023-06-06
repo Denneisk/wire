@@ -4,6 +4,7 @@
 
 local floor = math.floor
 local Clamp = math.Clamp
+local char = string.char
 
 registerCallback("construct", function(self)
 	self.triggercache = {}
@@ -647,6 +648,73 @@ e2function string wirelink:readString(address)
 	if not validWirelink(self, this) or not this.ReadCell then return "" end
 	return ReadStringZero(this, address)
 end
+
+__e2setcost(25)
+
+--- Writes a string that is stored in as 48-bit integers. Returns the length of the compressed string. Not guaranteed to be null-terminated.
+e2function number wirelink:writeString48(address, string data)
+	if not validWirelink(self, this) or not this.WriteCell then return self:throw("Not a valid memory device!", 0) end
+	
+	for i = 1, #data, 6 do
+		local a, b, c, d, e, f = string.byte(data, i, i + 5)
+		local packed = a * 0x10000000000
+		-- Combined because it would be far too bothersome to check every value
+		if b or c or d then
+			packed = packed + (b or 0) * 0x100000000 + (c or 0) * 0x1000000 + (d or 0) * 0x10000
+			-- Put this here because e, f depend on b, c, d to exist
+			if e or f then packed = packed + (e or 0) * 0x100 + (f or 0) end
+		end
+		
+		if not this:WriteCell(address, packed) then return math.ceil(#data / i / 6) end
+		address = address + 1
+	end
+	return math.ceil(#data / 6)
+end
+
+-- Reads the output of the above function. Uses length instead of null termination.
+e2function string wirelink:readString48(address, length)
+	if not validWirelink(self, this) or not this.ReadCell then return self:throw("Not a valid memory device!", "") end
+	
+	local str = {}
+	for index = address, address + length - 1 do
+		local packed = this:ReadCell(index)
+		local a, b, c, d, e, f = (packed / 0x10000000000) % 256, (packed / 0x100000000) % 256, (packed / 0x1000000) % 256, (packed / 0x10000) % 256, (packed / 0x100) % 256, packed % 256
+		
+		-- funny dependency triangle
+		table.insert(str, char(a))
+		if b ~= 0 then table.insert(str, char(b))
+			if c ~= 0 then table.insert(str, char(c))
+				if d ~= 0 then table.insert(str, char(d))
+					if e ~= 0 then table.insert(str, char(e))
+						if f ~= 0 then table.insert(str, char(f)) end
+					end
+				end
+			end
+		end
+	end
+	return table.concat(str)
+end
+
+--- Same as above but expects a null terminated string.
+e2function string wirelink:readString48(address)
+	if not validWirelink(self, this) or not this.ReadCell then return self:throw("Not a valid memory wirelink!", "") end
+	
+	local str = {}
+	for index = address, address + 16384 do
+		local packed = this:ReadCell(index)
+		local a, b, c, d, e, f = (packed / 0x10000000000) % 256, (packed / 0x100000000) % 256, (packed / 0x1000000) % 256, (packed / 0x10000) % 256, (packed / 0x100) % 256, packed % 256
+		
+		table.insert(str, char(a))
+		if b ~= 0 then table.insert(str, char(b)) else break end
+		if c ~= 0 then table.insert(str, char(c)) else break end
+		if d ~= 0 then table.insert(str, char(d)) else break end
+		if e ~= 0 then table.insert(str, char(e)) else break end
+		if f ~= 0 then table.insert(str, char(f)) else break end
+	end
+	return table.concat(str)
+end
+
+__e2setcost(20)
 
 /******************************************************************************/
 
