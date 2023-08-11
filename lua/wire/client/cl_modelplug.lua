@@ -681,6 +681,26 @@ ModelPlug.ListAddModels("Wire_InteractiveProp_Models", {
 	"models/props_trainstation/payphone001a.mdl"
 })
 
+ModelPlug.ListAddModels("Wire_Touchplate_Models", {
+	"models/hunter/plates/plate025x025.mdl",
+	"models/props_phx/construct/metal_plate1.mdl",
+	"models/props_phx/construct/metal_plate2x2.mdl",
+	"models/hunter/triangles/1x1x1carved025.mdl",
+	"models/hunter/tubes/circle2x2.mdl",
+	"models/hunter/geometric/hex1x1.mdl",
+	"models/hunter/plates/plate05x05.mdl",
+	"models/hunter/plates/plate075x075.mdl",
+	"models/hunter/plates/plate1x1.mdl",
+	"models/jaanus/wiretool/wiretool_range.mdl",
+	"models/bull/dynamicbutton.mdl",
+	"models/cheeze/pcb/pcb4.mdl",
+	"models/jaanus/thruster_flat.mdl",
+	"models/maxofs2d/hover_plate.mdl",
+	"models/props_c17/clock01.mdl",
+	"models/props_trainstation/trainstation_clock001.mdl",
+	"models/props_junk/sawblade001a.mdl",
+})
+
 --Dynamic button materials
 local WireDynamicButtonMaterials = {
 	["No Material"] = "",
