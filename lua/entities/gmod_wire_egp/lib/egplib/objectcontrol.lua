@@ -2,30 +2,39 @@
 -- Objects
 --------------------------------------------------------
 local EGP = EGP
-
+---@type { [string]: EGPObject }
 local egpObjects = {}
-egpObjects.Names = {}
-egpObjects.Names_Inverted = {}
+--- All implemented EGPObjects by lowercase name
 EGP.Objects = egpObjects
+---@type EGPObject[]
+local egpObjectsByID = {}
+--- An array of all implemented EGPObjects by ID. Note that ID is not as deterministic as names.
+EGP.ObjectsByID = egpObjectsByID
 
--- This object is not used. It's only a base
-local baseObj = {}
-baseObj.ID = 0
-baseObj.x = 0
-baseObj.y = 0
-baseObj.angle = 0
-baseObj.r = 255
-baseObj.g = 255
-baseObj.b = 255
-baseObj.a = 255
-baseObj.filtering = TEXFILTER.ANISOTROPIC
-baseObj.parent = 0
+--- A prototypical EGPObject to extend from.
+---@class EGPObject
+---@field ID integer The ID of the EGPObject class
+local baseObj = {
+	ID = 0,
+	x = 0,
+	y = 0,
+	angle = 0,
+	r = 255,
+	g = 255,
+	b = 255,
+	a = 255,
+	filtering = TEXFILTER.ANISOTROPIC,
+	parent = 0
+}
 if SERVER then
 	baseObj.material = ""
-	baseObj.EGP = NULL -- EGP entity parent
+	baseObj.EGP = NULL --[[@as Entity]] -- EGP entity parent
 else
 	baseObj.material = false
 end
+
+--- Used in a net writing context to transmit the object's entire data.
+---@see EGPObject.Receive
 function baseObj:Transmit()
 	EGP.SendPosAng(self)
 	EGP:SendColor( self )
@@ -33,6 +42,8 @@ function baseObj:Transmit()
 	if self.filtering then net.WriteUInt(math.Clamp(self.filtering,0,3), 2) end
 	net.WriteInt( self.parent, 16 )
 end
+--- Used in a net reading context to read the object's entire data.
+---@see EGPObject.Transmit
 function baseObj:Receive()
 	local tbl = {}
 	EGP.ReceivePosAng(tbl)
@@ -42,12 +53,25 @@ function baseObj:Receive()
 	tbl.parent = net.ReadInt(16)
 	return tbl
 end
+
+--- Serializes the data of the EGPObject for transmitting
 function baseObj:DataStreamInfo()
 	return { x = self.x, y = self.y, angle = self.angle, w = self.w, h = self.h, r = self.r, g = self.g, b = self.b, a = self.a, material = self.material, parent = self.parent }
 end
+--- Returns `true` if the object contains the point.
+---@param x number
+---@param y number
+---@return boolean
 function baseObj:Contains(x, y)
 	return false
 end
+
+--- Edits the fields of the EGPObject with the given table. Returns `true` if a field changed.
+--- Use `SetPos` for setting position directly. Use `Set` to set a single field.
+---@param args { [string]: any } The fields to edit on the object. Values are *not* type checked or sanity checked!
+---@return boolean # Whether the object changed
+---@see EGPObject.SetPos
+---@see EGPObject.Set
 function baseObj:EditObject(args)
 	local ret = false
 	if args.x or args.y or args.angle then
@@ -62,7 +86,19 @@ function baseObj:EditObject(args)
 	end
 	return ret
 end
-baseObj.Initialize = baseObj.EditObject
+
+--- A helper method for EGPObjects that may need to do something on initialization. Calls `EditObject` by default.
+---@param args { [string]: any }
+---@see EGPObject.EditObject
+function baseObj:Initialize(args) self:EditObject(args) end
+
+--- Sets the position of the EGPObject directly. This method should be overwritten if special behavior is needed.
+--- Call this method when you need to change position.
+---@param x number
+---@param y number
+---@param angle number In degrees
+---@return boolean # Whether the position changed
+---@see EGPObject.EditObject
 function baseObj:SetPos(x, y, angle)
 	local ret = false
 	if x and self.x ~= x then self.x, ret = x, true end
@@ -73,6 +109,11 @@ function baseObj:SetPos(x, y, angle)
 	end
 	return ret
 end
+
+--- Sets a single field of the EGP Object. Do **not** use this for position. Use `SetPos` instead.
+---@param member string
+---@param value any
+---@return boolean # Whether the field changed
 function baseObj:Set(member, value)
 	if self[member] and self[member] ~= value then
 		self[member] = value
@@ -81,75 +122,108 @@ function baseObj:Set(member, value)
 		return false
 	end
 end
+
 local M_EGPObject = {__tostring = function(self) return "[EGPObject] ".. self.Name end}
 setmetatable(baseObj, M_EGPObject)
 EGP.Objects.Base = baseObj
 
-local M_NULL_EGPOBJECT = { __tostring = function(self) return "[EGPObject] NULL" end, __eq = function(a, b) return getmetatable(a) == getmetatable(b) end }
+local M_NULL_EGPOBJECT
+local M_NULL_EGPOBJECT = { __tostring = function() return "[EGPObject] NULL" end, __eq = function(_, b) return getmetatable(b) == M_NULL_EGPOBJECT end }
+---@type EGPObject
 local NULL_EGPOBJECT = setmetatable({}, M_NULL_EGPOBJECT)
+--- An invalid EGPObject
 EGP.NULL_EGPOBJECT = NULL_EGPOBJECT
 
-----------------------------
--- Get Object
-----------------------------
-
-function EGP:GetObjectByID( ID )
-	for _, v in pairs( EGP.Objects ) do
-		if (v.ID == ID) then return table.Copy( v ) end
-	end
+--- Gets an instance of the EGPObject class by its numerical ID.
+---@param ID integer
+---@return EGPObject # A copy (instance) the class
+local function getObjectByID(ID)
+	return 
 	ErrorNoHalt( "[EGP] Error! Object with ID '" .. ID .. "' does not exist. Please post this bug message in the EGP thread on the wiremod forums.\n" )
 end
+EGP.GetObjectByID = getObjectByID
 
 ----------------------------
 -- Load all objects
 ----------------------------
 
-function EGP:NewObject(name, super)
+--- Creates a new EGPObject class and returns it reference. If you want to inherit from another class, see `EGP.ObjectInherit`, which properly handles out-of-order loading.
+---@param name string The name of the class. Case insensitive.
+---@param super EGPObject? The superclass of the class. If nil, defaults to base object.
+---@return EGPObject # The EGPObject class
+---@see EGP.ObjectInherit
+local function newObject(name, super)
 	local lower = name:lower() -- Makes my life easier
+	if egpObjects[lower] then return egpObjects[lower] end
+
 	if not super then super = baseObj end
-	if self.Objects[lower] then return self.Objects[lower] end
 
-	-- Create table
-	self.Objects[lower] = {}
-	-- Set info
-	self.Objects[lower].Name = name
-	table.Inherit(self.Objects[lower], super)
+	local newObj = {}
 
-	-- Create lookup table
-	local ID = table.Count(self.Objects)
-	self.Objects[lower].ID = ID
-	self.Objects.Names[name] = ID
+	newObj.Name = name
+	table.Inherit(newObj, super)
 
-	-- Inverted lookup table
-	self.Objects.Names_Inverted[ID] = lower
+	newObj.ID = #egpObjectsByID
 
-	return setmetatable(self.Objects[lower], M_EGPObject)
+	egpObjects[lower] = newObj
+	egpObjectsByID[ID] = newObj
+
+	return setmetatable(newObj, M_EGPObject)
 end
+EGP.NewObject = newObject
 
 local folder = "entities/gmod_wire_egp/lib/objects/"
 
+--- Used to inherit from another EGPObject class.
+---@return EGPObject # The new class
 function EGP.ObjectInherit(to, from)
-	local super = egpObjects[from:lower()]
+	from = from:lower()
+	local super = egpObjects[from]
+	if not super then
+		coroutine.yield(false, from)
+		super = egpObject[from]
+	end
 	if super then
-		return EGP:NewObject(to, super)
+		return newObject(to, super)
 	else
-		local path = folder .. from .. ".lua"
-		if file.Exists(path, "LUA") then
-			super = include(path)
-			AddCSLuaFile(path)
-			return EGP:NewObject(to, super)
-		else
-			ErrorNoHalt(string.format("EGP couldn't find object '%s' to inherit from (to object '%s').\n", from, to))
-		end
+		ErrorNoHalt(string.format("EGP couldn't find object %q to inherit from (to object %q).\n", from, to))
+		return NULL_EGPOBJECT
 	end
 end
 
 do
 	local files = file.Find(folder.."*.lua", "LUA")
+	local suspended = {}
+	local function yieldedProcess(target)
+		for _, rout in ipairs(target) do
+			local _, _, ret = rout.resume() -- Assume it succeeds this time
+
+			local suspendedFor = suspended[ret]
+			if suspendedFor then yieldedProcess(suspendedFor) end -- Recursively include everything else
+		end
+	end
+
 	for _, v in ipairs(files) do
 		if not egpObjects[v:sub(1, #v - 4):lower()] then -- Remove the extension and check if the object already exists.
-			include(folder .. v)
-			AddCSLuaFile(folder .. v)
+			local co = coroutine.create(function()
+				local ret = include(folder .. v)
+				AddCSLuaFile(folder .. v)
+				return true, ret.Name:lower()
+			end)
+
+			local _, success, ret = coroutine.resume(co)
+			local suspendedFor = suspended[ret]
+			if success then
+				if suspendedFor then
+					yieldedProcess(suspendedFor)
+				end
+			else
+				if not suspendedFor then
+					suspendedFor = {}
+					suspended[ret] = suspendedFor
+				end
+				suspendedFor[#suspendedFor + 1] = co
+			end
 		end
 	end
 end
